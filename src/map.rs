@@ -1,4 +1,6 @@
-use std::option::Option;
+use std::{option::Option, str::FromStr};
+use crate::gameobj::GameObject;
+
 pub enum Direction{
     North = 0,
     East = 1,
@@ -24,15 +26,6 @@ impl Direction{
             Direction::West => "West".to_string(),
         }
     }
-    fn from_string(direction: &str) -> Option<Direction>{
-        match direction{
-            "North" => Some(Direction::North),
-            "East" => Some(Direction::East),
-            "South" => Some(Direction::South),
-            "West" => Some(Direction::West),
-            _ => None,
-        }
-    }
 }
 
 struct Edge{
@@ -51,12 +44,35 @@ impl Edge{
             target_id,
         }
     }
+
+    fn unlock(&mut self){
+        self.is_locked = false;
+        self.is_closed = true;
+    }
+
+    fn open(&mut self){
+        if(!self.is_locked){
+            self.is_closed = false;
+        }
+    }
+
+    fn close(&mut self){
+        self.is_closed = true;
+    }
+
+    fn lock(&mut self){
+        if(!self.is_closed){
+            self.is_locked = true;
+        }
+    }
+
 }
 
 struct Location {
     name: String,
     description: String,
     exits: [Option<Edge>; 4],
+    objects: Vec<usize>
 }
 
 impl Location {
@@ -64,29 +80,36 @@ impl Location {
         Location {
             name: name.to_string(),
             description: description.to_string(),
-            exits
+            exits,
+            objects: vec![]
         }
+    }
+
+    fn add_object(&mut self, object_id: usize){
+        self.objects.push(object_id);
     }
 }
 
-pub struct Location_Dto {
+pub struct LocationDto {
     pub name: String,
     pub description: String,
     pub exits: String,
+    pub objects: String,
 }
 
 pub struct Map {
     locations: Vec<Location>,
+    objects: Vec<GameObject>,
 }
 
 impl Map{
     pub fn new () -> Map{
-            let locations = vec! [
+            let mut locations = vec! [
                 Location::new(
                     "The Shire",
                     "You are in the Shire. It is a peaceful place.",
                     [
-                        Some(Edge::new(1, false, false,0)),
+                        Some(Edge::new(1, true, false,0)),
                         None,
                         None,
                         None,
@@ -98,14 +121,23 @@ impl Map{
                     [
                         None,
                         None,
-                        Some(Edge::new(0, false, false, 0)),
+                        Some(Edge::new(0, true, false, 0)),
                         None
                     ]
                 )
             ];
-            Map{locations}
+            
+            // load object instances
+            let objects = vec![
+                GameObject::add_key("Shire Key".to_string(), 1)
+            ];
+
+            // add objects to locations
+            locations[0].add_object(0);
+            
+            Map{locations, objects}
     }
-    pub fn get_location(&self, location_id: usize) -> Option<Location_Dto>{
+    pub fn get_location(&self, location_id: usize) -> Option<LocationDto>{
         if location_id >= self.locations.len(){
             return None;
         }
@@ -118,10 +150,18 @@ impl Map{
                 _=> exits.push(Direction::from_usize(i).unwrap().to_string()),
             }
         }
-        Some(Location_Dto{
+
+        let mut objects = vec![];
+        for object_id in &location.objects{
+            let object = &self.objects[*object_id];
+            objects.push(object.get_name());
+        }
+
+        Some(LocationDto{
             name: location.name.clone(),
             description: location.description.clone(),
             exits: exits.join(", "),
+            objects: objects.join(", ")
         })
     }
     pub fn move_to(&self, location_id: usize, direction: Option<Direction>) -> Option<usize> {
@@ -141,6 +181,68 @@ impl Map{
                     None => None,
                 }
             }
+        }
+    }
+    pub fn  is_closed(&self, location_id: usize, direction: Direction) -> bool{
+        let location = &self.locations[location_id];
+        let exit = &location.exits[direction as usize];
+        match exit{
+            Some(edge) => edge.is_closed || edge.is_locked,
+            None => false,
+        }
+    }
+
+    pub fn is_locked(&self, location_id: usize, direction: Direction) -> bool{
+        let location = &self.locations[location_id];
+        let exit = &location.exits[direction as usize];
+        match exit{
+            Some(edge) => edge.is_locked,
+            None => false,
+        }
+    }
+
+    pub fn unlock(&mut self, location_id: usize, direction: Direction){
+        let location = &mut self.locations[location_id];
+        let exit = &mut location.exits[direction as usize];
+        match exit{
+            Some(edge) => edge.unlock(),
+            None => (),
+        }
+    }
+
+    pub fn open(&mut self, location_id: usize, direction: Direction){
+        let location = &mut self.locations[location_id];
+        let exit = &mut location.exits[direction as usize];
+        match exit{
+            Some(edge) => edge.open(),
+            None => (),
+        }
+    }
+
+    pub fn close(&mut self, location_id: usize, direction: Direction){
+        let location = &mut self.locations[location_id];
+        let exit = &mut location.exits[direction as usize];
+        match exit{
+            Some(edge) => edge.close(),
+            None => (),
+        }
+    }
+
+    pub fn lock(&mut self, location_id: usize, direction: Direction){
+        let location = &mut self.locations[location_id];
+        let exit = &mut location.exits[direction as usize];
+        match exit{
+            Some(edge) => edge.lock(),
+            None => (),
+        }
+    }
+
+    pub fn edge_target_matched(&self, location_id: usize, direction: Direction, target_id: i32) -> bool{
+        let location = &self.locations[location_id];
+        let exit = &location.exits[direction as usize];
+        match exit{
+            Some(edge) => edge.target_id == target_id,
+            None => false,
         }
     }
 }
