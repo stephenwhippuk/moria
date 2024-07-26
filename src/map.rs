@@ -1,39 +1,54 @@
-const UNBLOCKED: i32 = 0;
-const BLOCKED: i32 = -1;
-const LOCKED: i32 = -2;
-const CLOSED: i32 = -3;
-
-#[derive(PartialEq, Copy, Clone)]
-pub enum Direction {
-    Blocked = -1,
+use std::option::Option;
+pub enum Direction{
     North = 0,
     East = 1,
     South = 2,
-    West = 3,
+    West = 3
 }
 
-fn direction_to_string(direction: &Direction) -> String {
-    match *direction {
-        Direction::Blocked => "Blocked".to_string(),
-        Direction::North => "North".to_string(),
-        Direction::East => "East".to_string(),
-        Direction::South => "South".to_string(),
-        Direction::West => "West".to_string(),
+impl Direction{
+    fn from_usize(direction: usize) -> Option<Direction> {
+        match direction{
+            0 => Some(Direction::North),
+            1 => Some(Direction::East),
+            2 => Some(Direction::South),
+            3 => Some(Direction::West),
+            _ => None,
+        }
+    }
+    fn to_string(&self) -> String{
+        match *self{
+            Direction::North => "North".to_string(),
+            Direction::East => "East".to_string(),
+            Direction::South => "South".to_string(),
+            Direction::West => "West".to_string(),
+        }
+    }
+    fn from_string(direction: &str) -> Option<Direction>{
+        match direction{
+            "North" => Some(Direction::North),
+            "East" => Some(Direction::East),
+            "South" => Some(Direction::South),
+            "West" => Some(Direction::West),
+            _ => None,
+        }
     }
 }
 
-struct Exit {
-    direction: Direction,
-    name: String,
-    edge: i32,
+struct Edge{
+    destination: usize,
+    is_closed: bool,
+    is_locked: bool,
+    target_id: i32,
 }
 
-impl Exit {
-    fn new(direction: Direction, edge: i32) -> Exit {
-        Exit {
-            name: direction_to_string(&direction),
-            direction,
-            edge,
+impl Edge{
+    fn new(destination: usize, is_closed: bool, is_locked: bool, target_id: i32) -> Edge{
+        Edge{
+            destination,
+            is_closed,
+            is_locked,
+            target_id,
         }
     }
 }
@@ -41,55 +56,15 @@ impl Exit {
 struct Location {
     name: String,
     description: String,
-    exits: [Exit; 4],
+    exits: [Option<Edge>; 4],
 }
 
 impl Location {
-    fn new(name: &str, description: &str, exits: [i32; 4]) -> Location {
-        let exits = [
-            if exits[0] != -1 {
-                Exit::new(Direction::North, exits[0])
-            } else {
-                Exit::new(Direction::Blocked, -1)
-            },
-            if exits[1] != -1 {
-                Exit::new(Direction::East, exits[1])
-            } else {
-                Exit::new(Direction::Blocked, -1)
-            },
-            if exits[2] != -1 {
-                Exit::new(Direction::South, exits[2])
-            } else {
-                Exit::new(Direction::Blocked, -1)
-            },
-            if exits[3] != -1 {
-                Exit::new(Direction::West, exits[3])
-            } else {
-                Exit::new(Direction::Blocked, -1)
-            },
-        ];
+    fn new(name: &str, description: &str, exits: [Option<Edge>; 4]) -> Location {
         Location {
             name: name.to_string(),
             description: description.to_string(),
-            exits,
-        }
-    }
-}
-
-struct Edge {
-    destination: usize,
-    is_locked: bool,
-    is_closed: bool,
-    target_id: i32,
-}
-
-impl Edge {
-    fn new(destination: usize, is_locked: bool, is_closed: bool, target_id: i32) -> Edge {
-        Edge {
-            destination,
-            is_locked,
-            is_closed,
-            target_id,
+            exits
         }
     }
 }
@@ -101,90 +76,69 @@ pub struct Location_Dto {
 }
 
 pub struct Map {
-    // Each Location has a vector of Exits referencing Edges
-    // Each Edge has a destination Location and is each Edge is unidirectional
-    // so just because you can go from A to B doesn't mean you can go from B to A
     locations: Vec<Location>,
-    edges: Vec<Edge>,
 }
 
-impl Map {
-    pub fn new() -> Map {
-        let locations = vec![
-            Location::new("Start Room", "You are in the Start Room", [0, 2, 4, 6]),
-            Location::new(
-                "Dark Room",
-                "You are in a dark room.",
-                [BLOCKED, BLOCKED, 1, BLOCKED],
-            ),
-            Location::new(
-                "Bright Room",
-                "You are in a bright room.",
-                [BLOCKED, BLOCKED, BLOCKED, 3],
-            ),
-            Location::new(
-                "Room with a door",
-                "You are in a room with a door.",
-                [5, BLOCKED, BLOCKED, BLOCKED],
-            ),
-            Location::new(
-                "Kitchen",
-                "You are in the kitchen",
-                [BLOCKED, 7, BLOCKED, BLOCKED],
-            ),
-        ];
-        let edges = vec![
-            Edge::new(1, false, false, 0),
-            Edge::new(0, false, false, 0),
-            Edge::new(2, false, false, 0),
-            Edge::new(0, false, false, 0),
-            Edge::new(3, false, false, 0),
-            Edge::new(0, false, false, 0),
-            Edge::new(4, false, false, 0),
-            Edge::new(0, false, false, 0),
-        ];
-        Map { locations, edges }
+impl Map{
+    pub fn new () -> Map{
+            let locations = vec! [
+                Location::new(
+                    "The Shire",
+                    "You are in the Shire. It is a peaceful place.",
+                    [
+                        Some(Edge::new(1, false, false,0)),
+                        None,
+                        None,
+                        None,
+                    ]
+                ),
+                Location::new(
+                    "Moria",
+                    "You are in Moria. It is dark and scary.",
+                    [
+                        None,
+                        None,
+                        Some(Edge::new(0, false, false, 0)),
+                        None
+                    ]
+                )
+            ];
+            Map{locations}
     }
-
-    fn get_exits_string(&self, location: usize) -> String {
-        assert!(location < self.locations.len());
-
-        let mut exits = String::new();
-        for (i, exit) in self.locations[location].exits.iter().enumerate() {
-            if exit.edge != BLOCKED {
-                if i == &self.locations[location].exits.len() - 1 {
-                    exits.push_str(&format!("{}", exit.name));
-                } else {
-                    exits.push_str(&format!("{}, ", exit.name));
-                }
+    pub fn get_location(&self, location_id: usize) -> Option<Location_Dto>{
+        if location_id >= self.locations.len(){
+            return None;
+        }
+        
+        let location = &self.locations[location_id];
+        let mut exits = vec![];
+        for (i, edge) in location.exits.iter().enumerate(){
+            match edge{
+                None => continue,
+                _=> exits.push(Direction::from_usize(i).unwrap().to_string()),
             }
         }
-        exits
+        Some(Location_Dto{
+            name: location.name.clone(),
+            description: location.description.clone(),
+            exits: exits.join(", "),
+        })
     }
-
-    pub fn get_location(&self, location: usize) -> Location_Dto {
-        assert!(location < self.locations.len());
-
-        Location_Dto {
-            name: self.locations[location].name.clone(),
-            description: self.locations[location].description.clone(),
-            exits: self.get_exits_string(location),
-        }
-    }
-
-    pub fn move_to(&self, current_location: usize, direction: Direction) -> (i32, usize) {
-        assert!(current_location < self.locations.len());
-        assert!(direction != Direction::Blocked);
-
-        let selected_edge = self.locations[current_location].exits[direction as usize].edge;
-        match selected_edge {
-            BLOCKED => return (BLOCKED, 0),
-            _ => {
-                let edge = &self.edges[selected_edge as usize];
-                match edge {
-                    Edge {is_locked: true, ..} => return (LOCKED, 0),
-                    Edge {is_closed: true, ..} => return (CLOSED, 0),
-                    _  => return (UNBLOCKED, edge.destination),
+    pub fn move_to(&self, location_id: usize, direction: Option<Direction>) -> Option<usize> {
+        match direction{
+            None => Some(location_id),
+            Some(direction) => {
+                let location = &self.locations[location_id];
+                let exit = &location.exits[direction as usize];
+                match exit{
+                    Some(edge) => {
+                        if edge.is_closed || edge.is_locked{
+                            None
+                        } else {
+                            Some(edge.destination)
+                        }
+                    },
+                    None => None,
                 }
             }
         }
