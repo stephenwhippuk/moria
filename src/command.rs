@@ -2,6 +2,8 @@ use crate::map::Direction;
 use std::io;
 pub enum Command{
     Move(Direction),
+    Open(Direction),
+    Close(Direction),
     Quit,
 }
 
@@ -30,6 +32,44 @@ pub fn get_command() -> Option<Command>{
         },
         "w" => {
             Some(Command::Move(Direction::West))
+        },
+        "open" => {
+            match command[1] {
+                "n" => {
+                    Some(Command::Open(Direction::North))
+                },
+                "e" => {
+                    Some(Command::Open(Direction::East))
+                },
+                "s" => {
+                    Some(Command::Open(Direction::South))
+                },
+                "w" => {
+                    Some(Command::Open(Direction::West))
+                },
+                _ => {
+                    None
+                }
+            }
+        },
+        "close" => {
+            match command[1] {
+                "n" => {
+                    Some(Command::Close(Direction::North))
+                },
+                "e" => {
+                    Some(Command::Close(Direction::East))
+                },
+                "s" => {
+                    Some(Command::Close(Direction::South))
+                },
+                "w" => {
+                    Some(Command::Close(Direction::West))
+                },
+                _ => {
+                    None
+                }
+            }
         },
         _ => {
             None

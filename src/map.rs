@@ -1,6 +1,7 @@
-use std::{option::Option, str::FromStr};
+use std::option::Option;
 use crate::gameobj::GameObject;
 
+#[derive(Clone, Copy)]
 pub enum Direction{
     North = 0,
     East = 1,
@@ -28,46 +29,87 @@ impl Direction{
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum ExitStatus{
+    Open = 1,
+    Closed = 2,
+    Locked = 3,
+}
+
+impl ExitStatus{
+    pub fn parse(input : u32) -> Result<ExitStatus, &'static str> {
+        match input{
+            1 => Ok(ExitStatus::Open),
+            2 => Ok(ExitStatus::Closed),
+            3 => Ok(ExitStatus::Locked),
+            _ => Err("Invalid ExitStatus"),
+        }
+    }
+}
+
+#[derive(Clone)]
 struct Edge{
     destination: usize,
-    is_closed: bool,
-    is_locked: bool,
+    status: ExitStatus,
+    can_be_closed: bool,
     target_id: i32,
 }
 
 impl Edge{
-    fn new(destination: usize, is_closed: bool, is_locked: bool, target_id: i32) -> Edge{
+    fn new(destination: usize, status: ExitStatus, can_be_closed : bool, target_id: i32) -> Edge{
         Edge{
             destination,
-            is_closed,
-            is_locked,
+            status,
+            can_be_closed,
             target_id,
         }
     }
 
     fn unlock(&mut self){
-        self.is_locked = false;
-        self.is_closed = true;
+        match self.status {
+            ExitStatus::Locked => self.status = ExitStatus::Closed,
+            _ => (),
+        }
+    
     }
 
     fn open(&mut self){
-        if(!self.is_locked){
-            self.is_closed = false;
+        match self.status {
+            ExitStatus::Closed => self.status = ExitStatus::Open,
+            _ => (),
         }
     }
 
     fn close(&mut self){
-        self.is_closed = true;
+        match self.status {
+            ExitStatus::Open => self.status = ExitStatus::Closed,
+            _ => (),
+        }
     }
 
     fn lock(&mut self){
-        if(!self.is_closed){
-            self.is_locked = true;
+        match self.status {
+            ExitStatus::Closed => self.status = ExitStatus::Locked,
+            _ => (),
+        }
+    }
+    fn is_closed(&self) -> bool{
+        match self.status {
+            ExitStatus::Closed | ExitStatus::Locked => true,
+            _ => false,
+        }
+    }
+
+    fn is_locked(&self) -> bool{
+        match self.status {
+            ExitStatus::Locked => true,
+            _ => false,
         }
     }
 
 }
 
+#[derive(Clone)]
 struct Location {
     name: String,
     description: String,
@@ -109,7 +151,7 @@ impl Map{
                     "The Shire",
                     "You are in the Shire. It is a peaceful place.",
                     [
-                        Some(Edge::new(1, true, false,0)),
+                        Some(Edge::new(1, ExitStatus::Closed, true, 0)),
                         None,
                         None,
                         None,
@@ -121,7 +163,7 @@ impl Map{
                     [
                         None,
                         None,
-                        Some(Edge::new(0, true, false, 0)),
+                        Some(Edge::new(0, ExitStatus::Closed, true,  0)),
                         None
                     ]
                 )
@@ -163,31 +205,27 @@ impl Map{
             exits: exits.join(", "),
             objects: objects.join(", ")
         })
+
     }
-    pub fn move_to(&self, location_id: usize, direction: Option<Direction>) -> Option<usize> {
-        match direction{
-            None => Some(location_id),
-            Some(direction) => {
-                let location = &self.locations[location_id];
-                let exit = &location.exits[direction as usize];
-                match exit{
-                    Some(edge) => {
-                        if edge.is_closed || edge.is_locked{
-                            None
-                        } else {
-                            Some(edge.destination)
-                        }
-                    },
-                    None => None,
+    pub fn move_to(&self, location_id: usize, direction: Direction) -> Option<usize> {
+        let location = &self.locations[location_id];
+        let exit = &location.exits[direction as usize];
+        match exit{
+            Some(edge) => {
+                if edge.is_closed(){
+                    None
+                } else {
+                    Some(edge.destination)
                 }
-            }
+            },
+            None => None,
         }
     }
     pub fn  is_closed(&self, location_id: usize, direction: Direction) -> bool{
         let location = &self.locations[location_id];
         let exit = &location.exits[direction as usize];
         match exit{
-            Some(edge) => edge.is_closed || edge.is_locked,
+            Some(edge) => edge.is_closed(),
             None => false,
         }
     }
@@ -196,7 +234,7 @@ impl Map{
         let location = &self.locations[location_id];
         let exit = &location.exits[direction as usize];
         match exit{
-            Some(edge) => edge.is_locked,
+            Some(edge) => edge.is_locked(),
             None => false,
         }
     }
@@ -210,21 +248,80 @@ impl Map{
         }
     }
 
-    pub fn open(&mut self, location_id: usize, direction: Direction){
-        let location = &mut self.locations[location_id];
+    pub fn open(&mut self, location_id: usize, direction: Direction) -> Result<(), &'static str>{
+        let  location = &mut self.locations[location_id];
         let exit = &mut location.exits[direction as usize];
+        let mut found = false;
+        let mut destination: usize = 0;
+
         match exit{
-            Some(edge) => edge.open(),
-            None => (),
+            Some(edge) => {    
+                edge.open();  
+                destination = edge.destination;       
+                found = true;
+            }
+            None => ()
+        }
+        // now open the complentary exit if it exists 
+        if found {
+           let comp_direction = match direction {
+                Direction::North => Direction::South,
+                Direction::East => Direction::West,
+                Direction::South => Direction::North,
+                Direction::West => Direction::East,
+            };
+            let location = &mut self.locations[destination];
+            let edge = &mut location.exits[comp_direction as usize];
+            match edge{
+                Some(edge) => { 
+                    edge.open();
+                },
+                _ => ()
+            }
+            Ok(())
+        } else {
+            Err("No door to open in that direction")
         }
     }
 
-    pub fn close(&mut self, location_id: usize, direction: Direction){
-        let location = &mut self.locations[location_id];
+    pub fn close(&mut self, location_id: usize, direction: Direction) -> Result<(), &'static str>{
+        let  location = &mut self.locations[location_id];
         let exit = &mut location.exits[direction as usize];
+        let mut found = false;
+        let mut destination: usize = 0;
+
         match exit{
-            Some(edge) => edge.close(),
-            None => (),
+            Some(edge) => {    
+                if(edge.can_be_closed){
+                    edge.close();  
+                    destination = edge.destination;       
+                    found = true;
+                }
+                else{
+                    return Err("This door cannot be closed");
+                }
+            }
+            None => ()
+        }
+        // now open the complentary exit if it exists 
+        if found {
+           let comp_direction = match direction {
+                Direction::North => Direction::South,
+                Direction::East => Direction::West,
+                Direction::South => Direction::North,
+                Direction::West => Direction::East,
+            };
+            let location = &mut self.locations[destination];
+            let edge = &mut location.exits[comp_direction as usize];
+            match edge{
+                Some(edge) => { 
+                    edge.open();
+                },
+                _ => ()
+            }
+            Ok(())
+        } else {
+            Err("No door to open in that direction")
         }
     }
 

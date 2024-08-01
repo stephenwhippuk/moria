@@ -41,13 +41,35 @@ impl Game {
                     exit = true;
                 },
                 Some(Command::Move(direction)) => {
-                    let new_location = self.map.move_to(self.player.location_id, Some(direction));
+                    let new_location = self.map.move_to(self.player.location_id, direction);
                     match new_location {
                         Some(new_location) => {
                             self.player.location_id = new_location;
                         },
                         None => {
                             println!("You can't go that way");
+                        }
+                    }
+                },
+                Some(Command::Open(direction)) => {
+                    let res = self.map.open(self.player.location_id, direction);
+                    match res {
+                        Ok(_) => {
+                            println!("you opened the door");
+                        },
+                        Err(e) => {
+                            println!("{}", e);
+                        }
+                    }
+                },
+                Some(Command::Close(direction)) => {
+                    let res = self.map.close(self.player.location_id, direction);
+                    match res {
+                        Ok(_) => {
+                            println!("you closed the door");
+                        },
+                        Err(e) => {
+                            println!("{}", e);
                         }
                     }
                 },
