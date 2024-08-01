@@ -306,7 +306,7 @@ impl Map{
             }
             None => ()
         }
-        // now open the complentary exit if it exists 
+        // now close the complentary exit if it exists 
         if found {
            let comp_direction = Direction::complement(&direction);
             let location = &mut self.locations[destination];
@@ -319,7 +319,7 @@ impl Map{
             }
             Ok(())
         } else {
-            Err("No door to open in that direction")
+            Err("No door to close in that direction")
         }
     }
 
