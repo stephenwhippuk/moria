@@ -27,6 +27,14 @@ impl Direction{
             Direction::West => "West".to_string(),
         }
     }
+    fn complement(&self) -> Direction{
+        match *self{
+            Direction::North => Direction::South,
+            Direction::East => Direction::West,
+            Direction::South => Direction::North,
+            Direction::West => Direction::East,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -264,12 +272,7 @@ impl Map{
         }
         // now open the complentary exit if it exists 
         if found {
-           let comp_direction = match direction {
-                Direction::North => Direction::South,
-                Direction::East => Direction::West,
-                Direction::South => Direction::North,
-                Direction::West => Direction::East,
-            };
+            let comp_direction = Direction::complement(&direction);
             let location = &mut self.locations[destination];
             let edge = &mut location.exits[comp_direction as usize];
             match edge{
@@ -305,12 +308,7 @@ impl Map{
         }
         // now open the complentary exit if it exists 
         if found {
-           let comp_direction = match direction {
-                Direction::North => Direction::South,
-                Direction::East => Direction::West,
-                Direction::South => Direction::North,
-                Direction::West => Direction::East,
-            };
+           let comp_direction = Direction::complement(&direction);
             let location = &mut self.locations[destination];
             let edge = &mut location.exits[comp_direction as usize];
             match edge{
